@@ -197,12 +197,6 @@ M.setup = function(opts)
 			M.reset()
 		end
 
-		if current_mode == 'i' then
-			if key == utils.replace_termcodes('<esc>') then
-				M.reset()
-			end
-		end
-
 		if current_mode == 'n' then
 			if key == utils.replace_termcodes('<esc>') then
 				M.reset()
@@ -225,34 +219,6 @@ M.setup = function(opts)
 					operator_started = true
 				end
 			end
-
-			if key == utils.replace_termcodes('<c-w>') then
-				operator_started = true
-			end
-
-			if
-				key:lower() == 'v'
-				or key == utils.replace_termcodes('<c-v>')
-			then
-				if operator_started then
-					M.reset()
-				else
-					M.highlight('visual')
-					operator_started = true
-				end
-			end
-		end
-
-		if
-			current_mode:lower() == 'v'
-			or current_mode == utils.replace_termcodes('<c-v>')
-		then
-			if
-				key == utils.replace_termcodes('<esc>')
-				or key == current_mode
-			then
-				M.reset()
-			end
 		end
 	end)
 
@@ -262,22 +228,19 @@ M.setup = function(opts)
 		callback = M.define,
 	})
 
-	---Set insert highlight
-	vim.api.nvim_create_autocmd('InsertEnter', {
-		pattern = '*',
+	---Handle mode changes
+	vim.api.nvim_create_autocmd('ModeChanged', {
+		pattern = '*:[nivV\x16]',
 		callback = function()
-			M.highlight('insert')
+			M.highlight(({
+				n = 'default',
+				i = 'insert',
+				v = 'visual',
+				V = 'visual',
+				['\x16'] = 'visual',
+			})[vim.v.event.new_mode])
 		end,
 	})
-
-	---Reset highlights
-	vim.api.nvim_create_autocmd(
-		{ 'CmdlineLeave', 'InsertLeave', 'TextYankPost', 'WinLeave' },
-		{
-			pattern = '*',
-			callback = M.reset,
-		}
-	)
 
 	---Enable managed UI initially
 	M.enable_managed_ui()
