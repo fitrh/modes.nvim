@@ -53,18 +53,13 @@ local colors = {}
 local blended_colors = {}
 local operator_started = false
 
-M.reset = function()
-	M.highlight('default')
-	operator_started = false
-end
-
 ---Update highlights
 ---@param scene 'default'|'insert'|'visual'|'copy'|'delete'|
 M.highlight = function(scene)
 	local winhl_map = {}
 	local prev_value = vim.api.nvim_win_get_option(0, 'winhighlight')
 
-	-- mapping the old value of 'winhighlight'
+	-- mapping 'winhighlight' previous value
 	if prev_value ~= '' then
 		for _, winhl in ipairs(vim.split(prev_value, ',')) do
 			local pair = vim.split(winhl, ':')
@@ -81,7 +76,15 @@ M.highlight = function(scene)
 	for builtin, hl in pairs(winhl_map) do
 		table.insert(new_value, ('%s:%s'):format(builtin, hl))
 	end
-	vim.api.nvim_win_set_option(0, 'winhighlight', table.concat(new_value, ','))
+	new_value = table.concat(new_value, ',')
+
+	if scene == 'delete' or scene == 'copy' then
+		vim.defer_fn(function()
+			vim.api.nvim_win_set_option(0, 'winhighlight', new_value)
+		end, 0)
+	else
+		vim.api.nvim_win_set_option(0, 'winhighlight', new_value)
+	end
 
 	if vim.api.nvim_get_option('showmode') then
 		if scene == 'visual' then
@@ -191,35 +194,9 @@ M.setup = function(opts)
 
 	M.define()
 
-	vim.on_key(function(key)
-		local ok, current_mode = pcall(vim.fn.mode)
-		if not ok then
-			M.reset()
-		end
-
-		if current_mode == 'n' then
-			if key == utils.replace_termcodes('<esc>') then
-				M.reset()
-			end
-
-			if key == 'y' then
-				if operator_started then
-					M.reset()
-				else
-					M.highlight('copy')
-					operator_started = true
-				end
-			end
-
-			if key == 'd' then
-				if operator_started then
-					M.reset()
-				else
-					M.highlight('delete')
-					operator_started = true
-				end
-			end
-		end
+	local key = nil
+	vim.on_key(function(pressed_key)
+		key = pressed_key
 	end)
 
 	---Set highlights when colorscheme changes
@@ -230,15 +207,25 @@ M.setup = function(opts)
 
 	---Handle mode changes
 	vim.api.nvim_create_autocmd('ModeChanged', {
-		pattern = '*:[nivV\x16]',
 		callback = function()
-			M.highlight(({
+			local scene = ({
 				n = 'default',
 				i = 'insert',
 				v = 'visual',
 				V = 'visual',
 				['\x16'] = 'visual',
-			})[vim.v.event.new_mode])
+			})[vim.v.event.new_mode]
+
+			if scene then
+				if not operator_started then
+					M.highlight(scene)
+				end
+				operator_started = false
+			elseif vim.v.event.new_mode == 'no' then
+				operator_started = true
+				M.highlight(({ d = 'delete', y = 'copy' })[key] or 'default')
+				key = ''
+			end
 		end,
 	})
 
