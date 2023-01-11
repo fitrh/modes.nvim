@@ -209,33 +209,7 @@ M.setup = function(opts)
 	M.define()
 
 	vim.on_key(function(key)
-		local ok, current_mode = pcall(vim.fn.mode)
-		if not ok then
-			M.reset()
-			return
-		end
-
-		if current_mode == 'n' then
-			-- reset if coming back from operator pending mode
-			if operator_started then
-				M.reset()
-				return
-			end
-
-			if key == 'y' then
-				M.highlight('copy')
-				operator_started = true
-				return
-			end
-
-			if key == 'd' then
-				M.highlight('delete')
-				operator_started = true
-				return
-			end
-		end
-
-		if key == utils.replace_termcodes('<esc>') then
+		if operator_started or key == utils.replace_termcodes('<esc>') then
 			M.reset()
 			return
 		end
@@ -260,6 +234,18 @@ M.setup = function(opts)
 		pattern = '*:[vV\x16]',
 		callback = function()
 			M.highlight('visual')
+		end,
+	})
+
+	---Set operator-pending highlight
+	vim.api.nvim_create_autocmd('ModeChanged', {
+		pattern = '*:no',
+		callback = function()
+			local scene = ({ d = 'delete', y = 'copy' })[vim.v.operator]
+			if scene and not operator_started then
+				operator_started = true
+				M.highlight(scene)
+			end
 		end,
 	})
 
