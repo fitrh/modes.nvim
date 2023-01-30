@@ -188,6 +188,7 @@ M.disable_managed_ui = function()
 end
 
 M.setup = function(opts)
+	local ns = vim.api.nvim_create_namespace('modes.nvim')
 	opts = opts or default_config
 	if opts.focus_only then
 		print(
@@ -207,13 +208,6 @@ M.setup = function(opts)
 	end
 
 	M.define()
-
-	vim.on_key(function(key)
-		if operator_started or key == utils.replace_termcodes('<esc>') then
-			M.reset()
-			return
-		end
-	end)
 
 	---Set highlights when colorscheme changes
 	vim.api.nvim_create_autocmd('ColorScheme', {
@@ -245,6 +239,21 @@ M.setup = function(opts)
 			if scene and not operator_started then
 				operator_started = true
 				M.highlight(scene)
+			end
+		end,
+	})
+
+	---Reset operator-pending highlight
+	vim.api.nvim_create_autocmd('ModeChanged', {
+		pattern = 'no:n',
+		callback = function()
+			if not operator_started then
+				vim.on_key(nil, ns)
+				return
+			end
+
+			if operator_started then
+				vim.on_key(M.reset, ns)
 			end
 		end,
 	})
