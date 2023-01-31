@@ -262,7 +262,7 @@ M.setup = function(opts)
 
 	---Reset visual highlight
 	vim.api.nvim_create_autocmd('ModeChanged', {
-		pattern = '[vV\x16]:n',
+		pattern = '[vV\x16]*:[^vV\x16]', -- `*` for `vs` and `Vs`, see `:h v_CTRL-O`
 		callback = M.reset,
 	})
 
