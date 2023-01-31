@@ -245,16 +245,18 @@ M.setup = function(opts)
 
 	---Reset operator-pending highlight
 	vim.api.nvim_create_autocmd('ModeChanged', {
-		pattern = 'no:n',
+		pattern = 'no*:n',
 		callback = function()
 			if not operator_started then
 				vim.on_key(nil, ns)
 				return
 			end
 
-			if operator_started then
-				vim.on_key(M.reset, ns)
-			end
+			vim.on_key(function(key)
+				if not ({ v = 1, V = 1, ['\x16'] = 1 })[key] then -- not a forced-motion key
+					M.reset()
+				end
+			end, ns)
 		end,
 	})
 
