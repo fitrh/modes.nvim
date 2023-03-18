@@ -188,7 +188,6 @@ M.disable_managed_ui = function()
 end
 
 M.setup = function(opts)
-	local ns = vim.api.nvim_create_namespace('modes.nvim')
 	opts = opts or default_config
 	if opts.focus_only then
 		print(
@@ -231,6 +230,19 @@ M.setup = function(opts)
 		end,
 	})
 
+	---Reset operator-pending highlight
+	local function wait_for_reset()
+		local updatetime = vim.api.nvim_get_option_value('updatetime', {})
+		vim.api.nvim_set_option_value('updatetime', 0, {}) -- set to 0 for immediate callback from CursorHold
+		vim.api.nvim_create_autocmd('CursorHold', {
+			callback = function()
+				vim.api.nvim_set_option_value('updatetime', updatetime, {}) -- restore original `'updatetime'`
+				M.reset()
+				return true -- delete this autocmd
+			end,
+		})
+	end
+
 	---Set operator-pending highlight
 	vim.api.nvim_create_autocmd('ModeChanged', {
 		pattern = '*:no',
@@ -239,24 +251,8 @@ M.setup = function(opts)
 			if scene and not operator_started then
 				operator_started = true
 				M.highlight(scene)
+				wait_for_reset()
 			end
-		end,
-	})
-
-	---Reset operator-pending highlight
-	vim.api.nvim_create_autocmd('ModeChanged', {
-		pattern = 'no*:n',
-		callback = function()
-			if not operator_started then
-				vim.on_key(nil, ns)
-				return
-			end
-
-			vim.on_key(function(key)
-				if not ({ v = 1, V = 1, ['\x16'] = 1 })[key] then -- not a forced-motion key
-					M.reset()
-				end
-			end, ns)
 		end,
 	})
 
