@@ -1,6 +1,7 @@
 local utils = require('modes.utils')
 
 local M = {}
+local NS, WIN
 local config = {}
 local default_config = {
 	colors = {},
@@ -16,13 +17,6 @@ local default_config = {
 	ignore_filetypes = { 'NvimTree', 'TelescopePrompt' },
 }
 local winhighlight = {
-	default = {
-		CursorLine = 'CursorLine',
-		CursorLineNr = 'CursorLineNr',
-		CursorLineSign = 'CursorLineSign',
-		CursorLineFold = 'CursorLineFold',
-		Visual = 'Visual',
-	},
 	copy = {
 		CursorLine = 'ModesCopyCursorLine',
 		CursorLineNr = 'ModesCopyCursorLineNr',
@@ -59,7 +53,10 @@ local in_ignored_buffer = function()
 end
 
 M.reset = function()
-	M.highlight('default')
+	if WIN then
+		vim.api.nvim_win_set_hl_ns(WIN, 0)
+		WIN = nil
+	end
 	operator_started = false
 end
 
@@ -70,27 +67,11 @@ M.highlight = function(scene)
 		return
 	end
 
-	local winhl_map = {}
-	local prev_value = vim.api.nvim_win_get_option(0, 'winhighlight')
-
-	-- mapping the old value of 'winhighlight'
-	if prev_value ~= '' then
-		for _, winhl in ipairs(vim.split(prev_value, ',')) do
-			local pair = vim.split(winhl, ':')
-			winhl_map[pair[1]] = pair[2]
-		end
+	WIN = vim.api.nvim_get_current_win()
+	vim.api.nvim_win_set_hl_ns(WIN, NS)
+	for default, link in pairs(winhighlight[scene]) do
+		vim.api.nvim_set_hl(NS, default, { link = link })
 	end
-
-	-- overrides 'builtin':'hl' if the current scene has a mapping for it
-	for builtin, hl in pairs(winhighlight[scene]) do
-		winhl_map[builtin] = hl
-	end
-
-	local new_value = {}
-	for builtin, hl in pairs(winhl_map) do
-		table.insert(new_value, ('%s:%s'):format(builtin, hl))
-	end
-	vim.api.nvim_win_set_option(0, 'winhighlight', table.concat(new_value, ','))
 
 	if vim.api.nvim_get_option('showmode') then
 		if scene == 'visual' then
@@ -188,6 +169,7 @@ M.disable_managed_ui = function()
 end
 
 M.setup = function(opts)
+	NS = vim.api.nvim_create_namespace('modes.nvim')
 	opts = opts or default_config
 	if opts.focus_only then
 		print(
